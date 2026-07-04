@@ -649,7 +649,7 @@ function loadCar(){
     const hardCap=setTimeout(()=>fallback('hard-cap-15s'),15000);
     resetStall();
     loader.load(
-      './models/car.glb',
+      './models/car_draco.glb',
       gltf=>{
         if(done) return; done=true; clearTimeout(stallTimer); clearTimeout(hardCap);
         setProgress(.43,'DECODING CAR MESH…');
@@ -724,7 +724,7 @@ function loadRoad(){
     const hardCap=setTimeout(()=>fallback('hard-cap-15s'),15000);
     resetStall();
     loader.load(
-      './models/road.glb',
+      './models/road_draco.glb',
       gltf=>{
         if(done) return; done=true; clearTimeout(stallTimer); clearTimeout(hardCap);
         const model=gltf.scene;
