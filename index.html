@@ -386,10 +386,6 @@ sunLight.shadow.mapSize.set(2048,2048);
 Object.assign(sunLight.shadow.camera,{near:1,far:500,left:-150,right:150,top:80,bottom:-80});
 scene.add(sunLight);
 
-
-// Apply graphics settings based on device capabilities
-const deviceTier = detectDevicePerformance();
-applyGraphicsSettings(deviceTier);
 // Car head-lights effect
 const headL = new THREE.SpotLight(0xffffff, 3, 35, .3, .5);
 headL.castShadow=false;
@@ -449,69 +445,22 @@ function buildSegment(){
 
 // Streetlight group pool
 const lampPool=[];
-// Streetlight group pool with instanced rendering for better performance
-const lampPool=[];
 function buildLampGroup(){
-  const group=new THREE.Group();
-  
-  // Create shared geometries and materials
-  const poleGeometry=new THREE.CylinderGeometry(.12,.18,9,6);
-  const poleMaterial=new THREE.MeshLambertMaterial({color:0x444455});
-  const armGeometry=new THREE.BoxGeometry(2.5,.12,.12);
-  const armMaterial=new THREE.MeshLambertMaterial({color:0x444455});
-  const bulbGeometry=new THREE.SphereGeometry(.28,8,8);
-  const bulbMaterial=new THREE.MeshBasicMaterial({color:0xfff0b0});
-  
-  // Create instanced meshes (we'll have 2 instances per segment, up to NUM_SEGS segments)
-  const maxInstances=NUM_SEGS*2;
-  const poles=new THREE.InstancedMesh(poleGeometry,poleMaterial,maxInstances);
-  const arms=new THREE.InstancedMesh(armGeometry,armMaterial,maxInstances);
-  const bulbs=new THREE.InstancedMesh(bulbGeometry,bulbMaterial,maxInstances);
-  
-  group.add(poles);
-  group.add(arms);
-  group.add(bulbs);
-  
-  // Store lights separately (they can't be easily instanced)
-  const lights=[];
-  
-  let instanceId=0;
+  const g=new THREE.Group();
   for(let side of[-1,1]){
-    const polePos=new THREE.Vector3(side*(ROAD_HALF+4), 4.5, 0);
-    const armPos=new THREE.Vector3(side*(ROAD_HALF+4)+side*(-1.25), 9, 0);
-    const bulbPos=new THREE.Vector3(side*(ROAD_HALF+4)+side*(-2.5), 9, 0);
-    
-    // Set matrix for pole
-    const poleMatrix=new THREE.Matrix4().makeTranslation(polePos.x,polePos.y,polePos.z);
-    poles.setMatrixAt(instanceId,poleMatrix);
-    
-    // Set matrix for arm
-    const armMatrix=new THREE.Matrix4().makeTranslation(armPos.x,armPos.y,armPos.z);
-    arms.setMatrixAt(instanceId,armMatrix);
-    
-    // Set matrix for bulb
-    const bulbMatrix=new THREE.Matrix4().makeTranslation(bulbPos.x,bulbPos.y,bulbPos.z);
-    bulbs.setMatrixAt(instanceId,bulbMatrix);
-    
-    // Create point light
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(.12,.18,9,6),
+      new THREE.MeshLambertMaterial({color:0x444455}));
+    pole.position.set(side*(ROAD_HALF+4), 4.5, 0); g.add(pole);
+    const arm=new THREE.Mesh(new THREE.BoxGeometry(side>0?-2.5:2.5,.12,.12),
+      new THREE.MeshLambertMaterial({color:0x444455}));
+    arm.position.set(side*(ROAD_HALF+4)+side*(-1.25),9,0); g.add(arm);
+    const bulb=new THREE.Mesh(new THREE.SphereGeometry(.28,8,8),
+      new THREE.MeshBasicMaterial({color:0xfff0b0}));
+    bulb.position.set(side*(ROAD_HALF+4)+side*(-2.5),9,0); g.add(bulb);
     const pl=new THREE.PointLight(0xffcc66,1.5,20);
-    pl.position.copy(bulbPos);
-    lights.push(pl);
-    group.add(pl);
-    
-    instanceId++;
+    pl.position.copy(bulb.position); g.add(pl);
   }
-  
-  // Mark matrices as needing update
-  poles.instanceMatrix.needsUpdate=true;
-  arms.instanceMatrix.needsUpdate=true;
-  bulbs.instanceMatrix.needsUpdate=true;
-  
-  // Store lights in group for easy access
-  group.userData.lights=lights;
-  
-  scene.add(group);
-  return group;
+  scene.add(g); return g;
 }
 
 // City buildings pool (2 per segment side, randomised)
@@ -581,7 +530,7 @@ function recycleSegments(){
 }
 
 // ─── Exhaust particles ─────────────────────────────────────────────────────────
-let PTCL = window.PARTICLE_COUNT || 120;  // Use adaptive particle count
+const PTCL=120;
 let exGeo,exPos,exVel,exLife,exPts;
 function initExhaust(){
   exGeo=new THREE.BufferGeometry();
@@ -1025,16 +974,16 @@ async function boot(){
     };
   }
   try {
-    setProgress(.02,'LOADING CAR MODEL…');
-    await loadCar();
-    setProgress(.47,'LOADING CITY…');
+    setProgress(.02,'LOADING ROAD MODEL…');
+    await loadRoad();
+    setProgress(.47,'LOADING CAR MODEL…');
     if(isSlowConnection()||userSkipped){
       // Don't even attempt a ~15MB city model on a slow/metered connection —
       // go straight to the lightweight procedural city so the game is playable now.
       setProgress(.7,'SLOW CONNECTION — USING PROCEDURAL CITY…');
       await new Promise(r=>setTimeout(r,300));
     } else {
-      await loadRoad();
+      await loadCar();
     }
     clearTimeout(skipTimer);
     if(skipBtn) skipBtn.style.display='none';
@@ -1065,56 +1014,6 @@ async function boot(){
   }
 }
 
-// ─── Device Detection & Adaptive Quality ──────────────────────────────────────
-function detectDevicePrior() {
-  const ua = navigator.userAgent;
-  
-  // Check for mobile devices:
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
-  
-  // Check for low-end devices (simplified heuristic)
-  const isLowEnd = isMobile && (
-    /(Android.*Mobile|iPhone)/.test(ua) && 
-    !/(Chrome/[6-9]\d|Chrome/1\d\d|Safari/[6-9]\d)/.test(ua)
-  );
-  
-  // Check hardware concurrency (if available)
-  const hardwareConcurrency = navigator.hardwareConcurrency || 2;
-  const isLowCoreCount = hardwareConcurrency <= 2;
-  
-  // Return performance tier
-  return isMobile && (isLowEnd || isLowCoreCount) ? "low" : "medium";
-}
-
-function applyGraphicsSettings(tier) {
-  // Adjust shadow map size based on device capability
-  if (tier === "low") {
-    sunLight.shadow.mapSize.set(1024, 1024);
-    // Reduce particle count for exhaust on low-end
-    window.PARTICLE_COUNT = 60;
-  } else {
-    sunLight.shadow.mapSize.set(2048, 2048);
-    window.PARTICLE_COUNT = 120;
-  }
-  
-  // Optional: Adjust other settings based on tier
-  // Could adjust texture quality, effect intensity, etc.
-}
-
-
-// Device detection and adaptive quality
-function detectDevicePerformance() {
-  return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? "low" : "medium";
-}
-function applyGraphicsSettings(tier) {
-  if (tier === "low") {
-    sunLight.shadow.mapSize.set(1024, 1024);
-    window.PARTICLE_COUNT = 60;
-  } else {
-    sunLight.shadow.mapSize.set(2048, 2048);
-    window.PARTICLE_COUNT = 120;
-  }
-}
 boot();
 </script>
 </body>
