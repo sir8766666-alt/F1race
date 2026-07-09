@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
-import { useGLTF, OrbitControls, Stars, Sky, Camera, spotLight } from '@react-three/drei';
+import { useGLTF, OrbitControls, Stars, Sky } from '@react-three/drei';
 import { useFrame } from '@react-three/fiber';
 import './styles.css';
 
@@ -177,7 +177,7 @@ function Car() {
 }
 
 // ------------------------------------------------------------------
-// Road component
+// Road component (static)
 // ------------------------------------------------------------------
 function Road() {
   const { nodes, materials } = useGLTF('/models/road.glb');
@@ -192,7 +192,6 @@ function Scene() {
     <>
       <ambientLight intensity={0.5} />
       <directionalLight position={[10, 20, 10]} intensity={1.5} castShadow />
-      <spotLight position={[0, 30, 20]} angle={0.3} penumbra={1} intensity={2.5} castShadow />
       <Suspense fallback={null}>
         <Road />
         <Car />
@@ -207,11 +206,13 @@ function Scene() {
 function App() {
   return (
     <>
-      <Camera position={[0, 5, 15]} makeDefault>
-        <OrbitControls enableZoom={true} />
-      </Camera>
       <Sky />
-      <Canvas shadows camera={{ position: [0, 5, 15], fov: 60 }} gl={{ antialias: true }}>
+      <Canvas
+        shadows
+        camera={{ position: [0, 5, 15], fov: 60 }}
+        gl={{ antialias: true }}
+      >
+        <OrbitControls enableZoom={true} />
         <Scene />
       </Canvas>
     </>
