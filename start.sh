@@ -96,4 +96,107 @@ export ANTHROPIC_BASE_URL="http://127.0.0.1:8082"
 grep -qxF 'export PATH="$HOME/.local/bin:$PATH"' "$HOME/.bashrc" || \
     echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$HOME/.bashrc"
 
-grep -qx
+grep -qxF 'export ANTHROPIC_AUTH_TOKEN="freecc"' "$HOME/.bashrc" || \
+    echo 'export ANTHROPIC_AUTH_TOKEN="freecc"' >> "$HOME/.bashrc"
+
+grep -qxF 'export ANTHROPIC_BASE_URL="http://127.0.0.1:8082"' "$HOME/.bashrc" || \
+    echo 'export ANTHROPIC_BASE_URL="http://127.0.0.1:8082"' >> "$HOME/.bashrc"
+
+# ==========================================
+# Load Local Environment Variables
+# ==========================================
+
+if [ -f ".env" ]; then
+    echo "📂 Loading .env variables..."
+
+    set -a
+    # shellcheck disable=SC1091
+    source ".env"
+    set +a
+fi
+
+if [ ! -f ".env.example" ]; then
+    if [ -f ".env" ]; then
+        cp ".env" ".env.example"
+    else
+        touch ".env.example"
+    fi
+fi
+
+# ==========================================
+# Start / Restart Proxy
+# ==========================================
+
+echo "⚡ Starting proxy..."
+
+# Only stop an existing fcc-server process.
+# Do NOT use "pkill -f python" because it can kill
+# unrelated Python processes in the Codespace.
+if pgrep -f "$HOME/.local/bin/fcc-server" >/dev/null 2>&1; then
+    pkill -f "$HOME/.local/bin/fcc-server" 2>/dev/null || true
+    sleep 1
+fi
+
+# Remove old proxy log
+: > proxy.log
+
+"$HOME/.local/bin/fcc-server" > proxy.log 2>&1 &
+
+PROXY_PID=$!
+
+echo "⏳ Waiting for proxy..."
+
+PROXY_READY=false
+
+for _ in {1..15}; do
+    if curl -fsS \
+        --max-time 2 \
+        http://127.0.0.1:8082 >/dev/null 2>&1; then
+
+        PROXY_READY=true
+        break
+    fi
+
+    if ! kill -0 "$PROXY_PID" 2>/dev/null; then
+        break
+    fi
+
+    sleep 1
+done
+
+# ==========================================
+# Proxy Health Check
+# ==========================================
+
+if [ "$PROXY_READY" = true ]; then
+    echo "✅ Proxy server running on port 8082"
+else
+    echo "❌ Proxy startup failed"
+
+    if [ -f "proxy.log" ]; then
+        echo "----- proxy.log -----"
+        cat proxy.log
+        echo "---------------------"
+    fi
+
+    exit 1
+fi
+
+# ==========================================
+# Launch Claude
+# ==========================================
+
+echo "🚀 Launching Claude..."
+
+CLAUDE_BIN="$(command -v claude || true)"
+
+if [ -n "$CLAUDE_BIN" ]; then
+    chmod +x "$CLAUDE_BIN" 2>/dev/null || true
+fi
+
+# Launch exactly ONE Claude process.
+# Do not add another "claude" command after this;
+# exec replaces this shell with Claude Code.
+exec npx -y @anthropic-ai/claude-code \
+    --continue \
+    --dangerously-skip-permissions
