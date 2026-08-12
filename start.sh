@@ -92,8 +92,9 @@ fi
 # ==========================================
 echo "🧩 Preparing HoodAI Claude hooks..."
 
-HOODAI_ROOT="/workspaces/HoodAI"
-HOODAI_HOOK="$HOODAI_ROOT/.claude/hooks/hoodai-state.sh"
+PROJECT_ROOT="$(pwd)"
+HOODAI_ROOT="$PROJECT_ROOT"
+HOODAI_HOOK="$PROJECT_ROOT/.claude/hooks/hoodai-state.sh"
 
 mkdir -p "$HOODAI_ROOT/.claude/hooks"
 
