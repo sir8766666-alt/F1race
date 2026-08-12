@@ -149,9 +149,9 @@ echo "⏳ Waiting for proxy..."
 PROXY_READY=false
 
 for _ in {1..15}; do
-    if curl -fsS \
-        --max-time 2 \
-        http://127.0.0.1:8082 >/dev/null 2>&1; then
+    if curl -s \
+    --max-time 2 \
+    http://127.0.0.1:8082 >/dev/null 2>&1; then
 
         PROXY_READY=true
         break
